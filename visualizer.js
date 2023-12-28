@@ -22,14 +22,20 @@ function animation(time) {
     renderer.render(scene, camera);
 }
 
+export function updateScene(pdbText) {
+    scene.clear();
+
+    const cube = new THREE.Mesh(new THREE.BoxGeometry( 1, 1, 1 ), new THREE.MeshNormalMaterial());
+    scene.add(cube);
+
+    console.log(pdbText);
+}
+
 export function render(parent) {
     container = parent;
     camera.position.z = 3;
     camera.position.y = 2;
     camera.lookAt(0, 0, 0);
-
-    const cube = new THREE.Mesh(new THREE.BoxGeometry( 1, 1, 1 ), new THREE.MeshNormalMaterial());
-    scene.add(cube);
 
     renderer.setAnimationLoop(animation);
 

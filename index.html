@@ -10,9 +10,18 @@
 </script>
 
 <script type="module">
-    import { render } from 'visualizer';
+    import { render, updateScene } from 'visualizer';
+
+	const pdbTextArea = document.getElementById("pdb-contents");
+
+	function updateSceneWithText() {
+		updateScene(pdbTextArea.value);
+	}
+
+	document.getElementById("update").addEventListener("click", updateSceneWithText);
 
     render(document.getElementById("viz-holder"));
+    updateSceneWithText();
 </script>
 
 This will eventually be a demonstration of a molecule visualizer.<br />
@@ -21,3 +30,8 @@ For now, enjoy the cube!<br /><br />
 <div id="viz-holder" style="height: 50%; width: 50%;">
 
 </div>
+
+<br />
+<textarea id="pdb-contents" cols="80" rows="10"></textarea>
+<br />
+<button id="update">Click to update scene</button>
