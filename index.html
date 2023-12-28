@@ -1,0 +1,23 @@
+<!-- Boilerplate from https://threejs.org/docs/index.html#manual/en/introduction/Creating-a-scene live example https://jsfiddle.net/0c1oqf38/ -->
+
+<script type="importmap">
+	{
+		"imports": {
+			"three": "https://unpkg.com/three/build/three.module.js",
+            "visualizer": "./visualizer.js"
+		}
+	}
+</script>
+
+<script type="module">
+    import { render } from 'visualizer';
+
+    render(document.getElementById("viz-holder"));
+</script>
+
+This will eventually be a demonstration of a molecule visualizer.<br />
+For now, enjoy the cube!<br /><br />
+
+<div id="viz-holder" style="height: 50%; width: 50%;">
+
+</div>
