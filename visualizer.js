@@ -8,6 +8,10 @@ const renderer = new THREE.WebGLRenderer({
     antialias: true
 });
 
+const ATOM_RADIUS = 0.3;
+
+const material = new THREE.MeshNormalMaterial();
+
 function animation(time) {
     // Logic to handle the enclosing container being resized.
     const width = container.offsetWidth, height = container.offsetHeight;
@@ -22,13 +26,37 @@ function animation(time) {
     renderer.render(scene, camera);
 }
 
+function getAtomsFromPdb(pdbText) {
+    const lines = pdbText.split('\n');
+
+    const idToAtom = new Map();
+
+    for (const line of lines) {
+        const cells = line.split(/\s+/)
+        if (cells[0] === "HETATM" || cells[0] === "ATOM") {
+            const atom_id = parseInt(cells[1]);
+            const x = parseFloat(cells[6]);
+            const y = parseFloat(cells[7]);
+            const z = parseFloat(cells[8]);
+            const bonds = [];
+            idToAtom.set(atom_id, {x, y, z, bonds});
+        }
+    }
+    return idToAtom;
+}
+
 export function updateScene(pdbText) {
     scene.clear();
 
-    const cube = new THREE.Mesh(new THREE.BoxGeometry( 1, 1, 1 ), new THREE.MeshNormalMaterial());
-    scene.add(cube);
+    const idToAtom = getAtomsFromPdb(pdbText);
 
-    console.log(pdbText);
+    for (const [atom_id, {x, y, z, bonds}] of idToAtom) {
+        const atom = new THREE.Mesh(new THREE.SphereGeometry(ATOM_RADIUS), material);
+        atom.position.x = x;
+        atom.position.y = y;
+        atom.position.z = z;
+        scene.add(atom);
+    }
 }
 
 export function render(parent) {
