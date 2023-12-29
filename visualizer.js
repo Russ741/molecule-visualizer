@@ -32,14 +32,25 @@ function getAtomsFromPdb(pdbText) {
     const idToAtom = new Map();
 
     for (const line of lines) {
-        const cells = line.split(/\s+/)
-        if (cells[0] === "HETATM" || cells[0] === "ATOM") {
-            const atom_id = parseInt(cells[1]);
-            const x = parseFloat(cells[6]);
-            const y = parseFloat(cells[7]);
-            const z = parseFloat(cells[8]);
+        const recordName = line.slice(0, 6).trim();
+        if (recordName === "HETATM" || recordName === "ATOM") {
+            // https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
+            const atom_id = parseInt(line.slice(6, 11));
+            const x = parseFloat(line.slice(30, 38));
+            const y = parseFloat(line.slice(38, 46));
+            const z = parseFloat(line.slice(46, 54));
             const bonds = [];
             idToAtom.set(atom_id, {x, y, z, bonds});
+        } else if (recordName == "CONECT") {
+            // https://www.wwpdb.org/documentation/file-format-content/format33/sect10.html
+            const srcId = parseInt(line.slice(6, 11));
+            const destRanges = [11, 16, 21, 26, 31];
+            for (var i = 0; i < 4; ++i) {
+                const dest = parseInt(line.slice(destRanges[i], destRanges[i+1]));
+                if (isFinite(dest)) {
+                    idToAtom.get(srcId).bonds.push(dest);
+                }
+            }
         }
     }
     return idToAtom;
