@@ -34,9 +34,7 @@ function getBondGeometry(src, dst) {
 
     const geometry = new THREE.CylinderGeometry(0.1, 0.1, diff.length());
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.x = middle.x;
-    mesh.position.y = middle.y;
-    mesh.position.z = middle.z;
+    mesh.position.copy(middle);
     mesh.lookAt(dst);
     mesh.rotateOnAxis(V_X, PI/2);
     return mesh;
@@ -55,8 +53,9 @@ function getAtomsFromPdb(pdbText) {
             const x = parseFloat(line.slice(30, 38));
             const y = parseFloat(line.slice(38, 46));
             const z = parseFloat(line.slice(46, 54));
+            const xyz = new THREE.Vector3(x, y, z);
             const bonds = [];
-            idToAtom.set(atom_id, {x, y, z, bonds});
+            idToAtom.set(atom_id, {xyz, bonds});
         } else if (recordName == "CONECT") {
             // https://www.wwpdb.org/documentation/file-format-content/format33/sect10.html
             const srcId = parseInt(line.slice(6, 11));
@@ -77,16 +76,14 @@ export function updateScene(pdbText) {
 
     const idToAtom = getAtomsFromPdb(pdbText);
 
-    for (const [atom_id, {x, y, z, bonds}] of idToAtom) {
+    for (const [atom_id, {xyz, bonds}] of idToAtom) {
         const atom = new THREE.Mesh(new THREE.SphereGeometry(ATOM_RADIUS), material);
-        atom.position.x = x;
-        atom.position.y = y;
-        atom.position.z = z;
+        atom.position.copy(xyz);
         scene.add(atom);
 
         for (const destId of bonds) {
             const dest = idToAtom.get(destId);
-            const cylinder = getBondGeometry({x, y, z}, new THREE.Vector3(dest.x, dest.y, dest.z));
+            const cylinder = getBondGeometry(xyz, dest.xyz);
             scene.add(cylinder);
         }
     }
