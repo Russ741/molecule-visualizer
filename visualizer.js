@@ -9,6 +9,8 @@ const renderer = new THREE.WebGLRenderer({
 });
 
 const ATOM_RADIUS = 0.3;
+const PI = Math.PI;
+const V_X = {x: 1, y: 0, z: 0};
 
 const material = new THREE.MeshNormalMaterial();
 
@@ -20,10 +22,24 @@ function animation(time) {
     renderer.setSize(width, height);
 
     // Rotate the objects in the scene.
-    scene.rotation.x = Math.PI / 2;
+    scene.rotation.x = PI / 2;
     scene.rotation.z = time / 3000;
 
     renderer.render(scene, camera);
+}
+
+function getBondGeometry(src, dst) {
+    const diff = (new THREE.Vector3()).subVectors(dst, src);
+    const middle = (new THREE.Vector3()).addVectors(dst, src).divideScalar(2);
+
+    const geometry = new THREE.CylinderGeometry(0.1, 0.1, diff.length());
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.x = middle.x;
+    mesh.position.y = middle.y;
+    mesh.position.z = middle.z;
+    mesh.lookAt(dst);
+    mesh.rotateOnAxis(V_X, PI/2);
+    return mesh;
 }
 
 function getAtomsFromPdb(pdbText) {
@@ -67,6 +83,12 @@ export function updateScene(pdbText) {
         atom.position.y = y;
         atom.position.z = z;
         scene.add(atom);
+
+        for (const destId of bonds) {
+            const dest = idToAtom.get(destId);
+            const cylinder = getBondGeometry({x, y, z}, new THREE.Vector3(dest.x, dest.y, dest.z));
+            scene.add(cylinder);
+        }
     }
 }
 
