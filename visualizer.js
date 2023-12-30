@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(50, 1.0, 0.01, 15);
+const camera = new THREE.PerspectiveCamera(50, 1.0, 0.01, 1000);
 let container = null;
 
 const renderer = new THREE.WebGLRenderer({
@@ -71,10 +71,26 @@ function getAtomsFromPdb(pdbText) {
     return idToAtom;
 }
 
+function updateMinAndMax(idToAtom) {
+    const minV = new THREE.Vector3();
+    const maxV = new THREE.Vector3();
+
+    minV.copy(idToAtom.values().next().value.xyz);
+    maxV.copy(minV);
+
+    for (const [, {xyz, bonds}] of idToAtom.entries()) {
+        minV.min(xyz);
+        maxV.max(xyz);
+    }
+    return [minV, maxV];
+}
+
 export function updateScene(pdbText) {
     scene.clear();
 
     const idToAtom = getAtomsFromPdb(pdbText);
+    // TODO: The rotation is around the middle of the *scene*, not the middle of the molecule.
+    // To fix, would probably need to adjust the atoms *and bonds* by midV.
 
     for (const [atom_id, {xyz, bonds}] of idToAtom) {
         const atom = new THREE.Mesh(new THREE.SphereGeometry(ATOM_RADIUS), material);
@@ -87,13 +103,24 @@ export function updateScene(pdbText) {
             scene.add(cylinder);
         }
     }
+
+    const [minV, maxV] = updateMinAndMax(idToAtom);
+
+    const diff = (new THREE.Vector3()).subVectors(maxV, minV);
+    const dist = diff.length();
+
+    const midV = new THREE.Vector3().addVectors(minV, maxV).divideScalar(2);
+
+    const cameraV = new THREE.Vector3();
+    cameraV.copy(midV);
+    cameraV.addScalar(dist);
+
+    camera.position.copy(cameraV);
+    camera.lookAt(midV);
 }
 
 export function render(parent) {
     container = parent;
-    camera.position.z = 3;
-    camera.position.y = 2;
-    camera.lookAt(0, 0, 0);
 
     renderer.setAnimationLoop(animation);
 
