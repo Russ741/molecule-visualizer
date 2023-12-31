@@ -8,6 +8,8 @@ const renderer = new THREE.WebGLRenderer({
     antialias: true
 });
 
+let moleculeBoxDiag = 0;
+
 const ATOM_RADIUS = 0.3;
 const PI = Math.PI;
 const V_X = {x: 1, y: 0, z: 0};
@@ -44,6 +46,8 @@ function getAtomsFromPdb(pdbText) {
     const lines = pdbText.split('\n');
 
     const idToAtom = new Map();
+    const minV = new THREE.Vector3(Infinity, Infinity, Infinity);
+    const maxV = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
 
     for (const line of lines) {
         const recordName = line.slice(0, 6).trim();
@@ -54,6 +58,8 @@ function getAtomsFromPdb(pdbText) {
             const y = parseFloat(line.slice(38, 46));
             const z = parseFloat(line.slice(46, 54));
             const xyz = new THREE.Vector3(x, y, z);
+            minV.min(xyz);
+            maxV.max(xyz);
             const bonds = [];
             idToAtom.set(atom_id, {xyz, bonds});
         } else if (recordName == "CONECT") {
@@ -68,29 +74,20 @@ function getAtomsFromPdb(pdbText) {
             }
         }
     }
-    return idToAtom;
-}
 
-function updateMinAndMax(idToAtom) {
-    const minV = new THREE.Vector3();
-    const maxV = new THREE.Vector3();
-
-    minV.copy(idToAtom.values().next().value.xyz);
-    maxV.copy(minV);
-
-    for (const [, {xyz, bonds}] of idToAtom.entries()) {
-        minV.min(xyz);
-        maxV.max(xyz);
+    moleculeBoxDiag = (new THREE.Vector3()).subVectors(maxV, minV).length();
+    const midV = new THREE.Vector3().addVectors(minV, maxV).divideScalar(2);
+    // Move the midpoint of the molecule to the middle of the scene by translating all of the atoms' positions.
+    for (const [, {xyz, }] of idToAtom.entries()) {
+        xyz.sub(midV);
     }
-    return [minV, maxV];
+    return idToAtom;
 }
 
 export function updateScene(pdbText) {
     scene.clear();
 
     const idToAtom = getAtomsFromPdb(pdbText);
-    // TODO: The rotation is around the middle of the *scene*, not the middle of the molecule.
-    // To fix, would probably need to adjust the atoms *and bonds* by midV.
 
     for (const [atom_id, {xyz, bonds}] of idToAtom) {
         const atom = new THREE.Mesh(new THREE.SphereGeometry(ATOM_RADIUS), material);
@@ -104,19 +101,7 @@ export function updateScene(pdbText) {
         }
     }
 
-    const [minV, maxV] = updateMinAndMax(idToAtom);
-
-    const diff = (new THREE.Vector3()).subVectors(maxV, minV);
-    const dist = diff.length();
-
-    const midV = new THREE.Vector3().addVectors(minV, maxV).divideScalar(2);
-
-    const cameraV = new THREE.Vector3();
-    cameraV.copy(midV);
-    cameraV.addScalar(dist);
-
-    camera.position.copy(cameraV);
-    camera.lookAt(midV);
+    camera.position.z = moleculeBoxDiag;
 }
 
 export function render(parent) {
