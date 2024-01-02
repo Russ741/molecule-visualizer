@@ -51,27 +51,31 @@ function getAtomsFromPdb(pdbText) {
 
     for (const line of lines) {
         const recordName = line.slice(0, 6).trim();
-        if (recordName === "HETATM" || recordName === "ATOM") {
-            // https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
-            const atom_id = parseInt(line.slice(6, 11));
-            const x = parseFloat(line.slice(30, 38));
-            const y = parseFloat(line.slice(38, 46));
-            const z = parseFloat(line.slice(46, 54));
-            const xyz = new THREE.Vector3(x, y, z);
-            minV.min(xyz);
-            maxV.max(xyz);
-            const bonds = [];
-            idToAtom.set(atom_id, {xyz, bonds});
-        } else if (recordName == "CONECT") {
-            // https://www.wwpdb.org/documentation/file-format-content/format33/sect10.html
-            const srcId = parseInt(line.slice(6, 11));
-            const destRanges = [11, 16, 21, 26, 31];
-            for (var i = 0; i < 4; ++i) {
-                const dest = parseInt(line.slice(destRanges[i], destRanges[i+1]));
-                if (isFinite(dest)) {
-                    idToAtom.get(srcId).bonds.push(dest);
+        switch (recordName) {
+            case "ATOM":
+            case "HETATM":
+                // https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
+                const atom_id = parseInt(line.slice(6, 11));
+                const x = parseFloat(line.slice(30, 38));
+                const y = parseFloat(line.slice(38, 46));
+                const z = parseFloat(line.slice(46, 54));
+                const xyz = new THREE.Vector3(x, y, z);
+                minV.min(xyz);
+                maxV.max(xyz);
+                const bonds = [];
+                idToAtom.set(atom_id, {xyz, bonds});
+                break;
+            case "CONECT":
+                // https://www.wwpdb.org/documentation/file-format-content/format33/sect10.html
+                const srcId = parseInt(line.slice(6, 11));
+                const destRanges = [11, 16, 21, 26, 31];
+                for (var i = 0; i < 4; ++i) {
+                    const dest = parseInt(line.slice(destRanges[i], destRanges[i+1]));
+                    if (isFinite(dest)) {
+                        idToAtom.get(srcId).bonds.push(dest);
+                    }
                 }
-            }
+                break;
         }
     }
 
