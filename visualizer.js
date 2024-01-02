@@ -1,5 +1,51 @@
 import * as THREE from 'three';
 
+class Residue {
+    resSeq;
+    resName = "";
+    atomNameToId = new Map();
+
+    constructor(resSeq) {
+        this.resSeq = resSeq;
+    }
+
+    addAtom(atomName, atomId) {
+        // If there are multiple alternate locations, the last one will win
+        this.atomNameToId.set(atomName, atomId);
+    }
+}
+
+class Chain {
+    chainId;
+    residues = new Map();
+
+    constructor(chainId) {
+        this.chainId = chainId;
+    }
+
+    residue(resSeq) {
+        var residue = this.residues.get(resSeq);
+        if (residue === undefined) {
+            residue = new Residue(resSeq);
+            this.residues.set(resSeq, residue);
+        }
+        return residue;
+    }
+}
+
+class Molecule {
+    chains = new Map();
+
+    chain(chainId) {
+        var chain = this.chains.get(chainId);
+        if (chain === undefined) {
+            chain = new Chain(chainId);
+            this.chains.set(chainId, chain);
+        }
+        return chain;
+    }
+}
+
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(50, 1.0, 0.01, 1000);
 let container = null;
@@ -13,6 +59,8 @@ let moleculeBoxDiag = 0;
 const ATOM_RADIUS = 0.3;
 const PI = Math.PI;
 const V_X = {x: 1, y: 0, z: 0};
+const SRC_INTER_RESIDUE_ATOM_NAME = " C  ";
+const DST_INTER_RESIDUE_ATOM_NAME = " N  ";
 
 const material = new THREE.MeshNormalMaterial();
 
@@ -45,6 +93,7 @@ function getBondGeometry(src, dst) {
 function getAtomsFromPdb(pdbText) {
     const lines = pdbText.split('\n');
 
+    var molecule = new Molecule();
     const idToAtom = new Map();
     const minV = new THREE.Vector3(Infinity, Infinity, Infinity);
     const maxV = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
@@ -55,6 +104,8 @@ function getAtomsFromPdb(pdbText) {
             case "ATOM":
             case "HETATM":
                 // https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
+
+                // Shared code for ATOM and HETATM
                 const atom_id = parseInt(line.slice(6, 11));
                 const x = parseFloat(line.slice(30, 38));
                 const y = parseFloat(line.slice(38, 46));
@@ -64,6 +115,22 @@ function getAtomsFromPdb(pdbText) {
                 maxV.max(xyz);
                 const bonds = [];
                 idToAtom.set(atom_id, {xyz, bonds});
+                // TODO: Handle alternate conformations better.
+                // We probably don't want to draw both concurrently.
+
+                if (recordName == "HETATM") {
+                    break;
+                }
+
+                // ATOM-only code to add residue atoms to the residue hierarchy
+                const atomName = line.slice(12, 16);
+                const resName = line.slice(17, 20);
+                const chainId = line.slice(21, 22);
+                const resSeq = parseInt(line.slice(22, 26));
+
+                const residue = molecule.chain(chainId).residue(resSeq);
+                residue.resName = resName;
+                residue.addAtom(atomName, atom_id);
                 break;
             case "CONECT":
                 // https://www.wwpdb.org/documentation/file-format-content/format33/sect10.html
@@ -85,13 +152,29 @@ function getAtomsFromPdb(pdbText) {
     for (const [, {xyz, }] of idToAtom.entries()) {
         xyz.sub(midV);
     }
-    return idToAtom;
+    return [molecule, idToAtom];
+}
+
+function addInterResidueBonds(molecule, idToAtom) {
+    for (const [, chain] of molecule.chains) {
+        for (const [resSeq, residue] of chain.residues) {
+            // TODO: Check residue type
+            const lastResidue = chain.residues.get(resSeq - 1);
+            if (!lastResidue) {
+                continue;
+            }
+            const srcId = lastResidue.atomNameToId.get(SRC_INTER_RESIDUE_ATOM_NAME);
+            const destId = residue.atomNameToId.get(DST_INTER_RESIDUE_ATOM_NAME);
+            idToAtom.get(srcId).bonds.push(destId);
+        }
+    }
 }
 
 export function updateScene(pdbText) {
     scene.clear();
 
-    const idToAtom = getAtomsFromPdb(pdbText);
+    const [molecule, idToAtom] = getAtomsFromPdb(pdbText);
+    addInterResidueBonds(molecule, idToAtom);
 
     for (const [atom_id, {xyz, bonds}] of idToAtom) {
         const atom = new THREE.Mesh(new THREE.SphereGeometry(ATOM_RADIUS), material);
