@@ -1,5 +1,43 @@
 import * as THREE from 'three';
 
+class ResidueBonds {
+    srcNameToDstNames = new Map();
+
+    addBond(src, dst) {
+        var dsts = this.srcNameToDstNames.get(src);
+        if (dsts === undefined) {
+            dsts = new Set();
+            this.srcNameToDstNames.set(src, dsts);
+        }
+        dsts.add(dst);
+    }
+}
+
+class ResidueDict {
+    residueNameToAtomsAndBonds = new Map();
+
+    addBonds(residueName, srcName, dstNamesStr) {
+        var residueBonds = this.residueNameToAtomsAndBonds.get(residueName);
+        if (residueBonds === undefined) {
+            residueBonds = new ResidueBonds();
+            this.residueNameToAtomsAndBonds.set(residueName, residueBonds);
+        }
+
+        const dstNames = dstNamesStr.split(' ').filter((dstName) => dstName.length > 0);
+        for (const dstName of dstNames) {
+            residueBonds.addBond(srcName, dstName);
+        }
+    }
+
+    getResidueBonds(residueName) {
+        const result = this.residueNameToAtomsAndBonds.get(residueName);
+        if (result === undefined) {
+            console.log("Undefined residue: ", residueName);
+        }
+        return result;
+    }
+}
+
 class Residue {
     resSeq;
     resName = "";
@@ -59,8 +97,8 @@ let moleculeBoxDiag = 0;
 const ATOM_RADIUS = 0.3;
 const PI = Math.PI;
 const V_X = {x: 1, y: 0, z: 0};
-const SRC_INTER_RESIDUE_ATOM_NAME = " C  ";
-const DST_INTER_RESIDUE_ATOM_NAME = " N  ";
+const SRC_INTER_RESIDUE_ATOM_NAME = "C";
+const DST_INTER_RESIDUE_ATOM_NAME = "N";
 
 const material = new THREE.MeshNormalMaterial();
 
@@ -88,6 +126,29 @@ function getBondGeometry(src, dst) {
     mesh.lookAt(dst);
     mesh.rotateOnAxis(V_X, PI/2);
     return mesh;
+}
+
+function getResidueDict(dictText) {
+    const lines = dictText.split('\n');
+
+    const residueDict = new ResidueDict();
+
+    var residueName = null;
+    for (const line of lines) {
+        const recordName = line.slice(0, 6).trim();
+        switch (recordName) {
+            case "RESIDU":
+                residueName = line.slice(10, 14).trim();
+                break;
+            case "CONECT":
+                const srcAtomName = line.slice(12, 17).trim();
+                const dstNamesStr = line.slice(21);
+                residueDict.addBonds(residueName, srcAtomName, dstNamesStr)
+                break;
+        }
+    }
+
+    return residueDict;
 }
 
 function getAtomsFromPdb(pdbText) {
@@ -123,7 +184,7 @@ function getAtomsFromPdb(pdbText) {
                 }
 
                 // ATOM-only code to add residue atoms to the residue hierarchy
-                const atomName = line.slice(12, 16);
+                const atomName = line.slice(12, 16).trim();
                 const resName = line.slice(17, 20);
                 const chainId = line.slice(21, 22);
                 const resSeq = parseInt(line.slice(22, 26));
@@ -155,6 +216,37 @@ function getAtomsFromPdb(pdbText) {
     return [molecule, idToAtom];
 }
 
+function addIntraResidueBonds(molecule, residueDict, idToAtom) {
+    for (const [, chain] of molecule.chains) {
+        for (const [, residue] of chain.residues) {
+            const resName = residue.resName;
+            const atomNameToId = residue.atomNameToId;
+            const residueBonds = residueDict.getResidueBonds(resName);
+            if (residueBonds === undefined) {
+                console.log(`Residue ${residue.resSeq} has undefined residue type ${resName}`);
+                continue;
+            }
+            for (const [srcName, dstNames] of residueBonds.srcNameToDstNames) {
+                if (!atomNameToId.has(srcName)) {
+                    console.log(`Could not find src ${srcName} in ${resName} ${residue.resSeq}`);
+                    continue;
+                }
+
+                const srcId = atomNameToId.get(srcName);
+                const srcBonds = idToAtom.get(srcId).bonds;
+                for (const dstName of dstNames) {
+                    if (!atomNameToId.has(dstName)) {
+                        console.log(`Could not find dst ${dstName} in ${resName} ${residue.resSeq}`);
+                        continue;
+                    }
+                    const dstId = atomNameToId.get(dstName);
+                    srcBonds.push(dstId);
+                }
+            }
+        }
+    }
+}
+
 function addInterResidueBonds(molecule, idToAtom) {
     for (const [, chain] of molecule.chains) {
         for (const [resSeq, residue] of chain.residues) {
@@ -170,10 +262,13 @@ function addInterResidueBonds(molecule, idToAtom) {
     }
 }
 
-export function updateScene(pdbText) {
+export function updateScene(pdbText, dictText) {
     scene.clear();
 
+    const residueDict = getResidueDict(dictText);
+
     const [molecule, idToAtom] = getAtomsFromPdb(pdbText);
+    addIntraResidueBonds(molecule, residueDict, idToAtom);
     addInterResidueBonds(molecule, idToAtom);
 
     for (const [atom_id, {xyz, bonds}] of idToAtom) {
