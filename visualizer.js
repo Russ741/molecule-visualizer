@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
 
 class ResidueBonds {
     srcNameToDstNames = new Map();
@@ -92,6 +94,8 @@ const renderer = new THREE.WebGLRenderer({
     antialias: true
 });
 
+const controls = new OrbitControls(camera, renderer.domElement);
+
 let moleculeBoxDiag = 0;
 
 const ATOM_RADIUS = 0.3;
@@ -108,10 +112,6 @@ function animation(time) {
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height);
-
-    // Rotate the objects in the scene.
-    scene.rotation.x = PI / 2;
-    scene.rotation.z = time / 3000;
 
     renderer.render(scene, camera);
 }
