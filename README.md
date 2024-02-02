@@ -21,7 +21,7 @@ To select a different molecule:
 * Press the "Click to update scene" button.
 
 ### Non-default Chemical Components
-To provide bond data for chemical components other than the basic amino acids (already provided by default):
+To provide bond data for chemical components other than the basic amino acids (which are already provided by default):
 * Go to the [PDB HET Dictionary](https://files.wwpdb.org/pub/pdb/data/monomers/)
 * Select the component by three-character name (e.g. https://files.wwpdb.org/pub/pdb/data/monomers/HPR)
 * Copy the contents of the selected file
