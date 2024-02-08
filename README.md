@@ -2,9 +2,11 @@
 
 A 3D visualizer for [PDB format](https://en.wikipedia.org/wiki/Protein_Data_Bank_(file_format)) molecular structures.
 
-## How To Use
-
 The live demo can be seen [here](https://russ741.github.io/molecule-visualizer/).
+
+![A rendering of a proline molecule](/proline.png)
+
+## How To Use
 
 The camera controls follow the OrbitControls conventions
 (see [this page](https://github.com/mrdoob/three.js/blob/841d2e791d3e8a2463322c5ca31b16956828b91c/examples/jsm/controls/OrbitControls.js#L17) for details)
